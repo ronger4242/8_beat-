@@ -6,10 +6,10 @@
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="极稳口令器">
+    <meta name="apple-mobile-web-app-title" content="精准口令器">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3043/3043817.png">
 
-    <title>绝对精准八拍口令器</title>
+    <title>精准动感八拍口令器</title>
     <style>
         body {
             font-family: -apple-system, system-ui, sans-serif;
@@ -141,10 +141,10 @@
 <body>
 
 <div class="container">
-    <h1>⚡ 爸爸的终极极稳口令器</h1>
+    <h1>⚡ 爸爸的绝对精准口令器</h1>
     
     <div class="display-box">
-        <div class="status" id="status-text">高精度硬件级引擎就绪</div>
+        <div class="status" id="status-text">高精度时钟就绪</div>
         <div class="numbers" id="beat-display">GO!</div>
     </div>
 
@@ -169,12 +169,14 @@
     let currentBeat = 1;
     let isPlaying = false;
     
+    // 高精度时间调度变量
     let audioCtx = null;
-    let nextNoteTime = 0.0;     
-    let timerID = null;         
+    let nextNoteTime = 0.0;     // 下一个音符播放的精确时间
+    let timerID = null;         // 高频预调度检查器
+    let preferredVoice = null;
 
-    const lookahead = 25.0;     
-    const scheduleAheadTime = 0.1; 
+    const lookahead = 25.0;     // 每 25 毫秒检查一次
+    const scheduleAheadTime = 0.1; // 提前 0.1 秒把声音预排进系统硬件缓存
 
     const gridContainer = document.getElementById('beat-grid');
     const actionBtn = document.getElementById('btn-action');
@@ -183,7 +185,16 @@
     const beatDisplay = document.getElementById('beat-display');
     const statusText = document.getElementById('status-text');
 
-    // 1. 重低音大鼓 (Kick)
+    // 锁定声音角色
+    function loadVoices() {
+        const voices = window.speechSynthesis.getVoices();
+        preferredVoice = voices.find(v => v.lang.includes('zh') && (v.name.includes('Tingting') || v.name.includes('婷婷'))) 
+                       || voices.find(v => v.lang.includes('zh'));
+    }
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+
+    // 1. 重低音大鼓 (Kick) - 绑定精确时间戳 time
     function playKick(time) {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -191,16 +202,16 @@
         gain.connect(audioCtx.destination);
 
         osc.frequency.setValueAtTime(120, time);
-        osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.22);
+        osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.25);
 
         gain.gain.setValueAtTime(0.5, time);
-        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.22);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.25);
 
         osc.start(time);
-        osc.stop(time + 0.22);
+        osc.stop(time + 0.25);
     }
 
-    // 2. 清脆军鼓 (Snare)
+    // 2. 清脆军鼓 (Snare) - 绑定精确时间戳 time
     function playSnare(time) {
         const bufferSize = audioCtx.sampleRate * 0.12;
         const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
@@ -214,7 +225,7 @@
 
         const noiseFilter = audioCtx.createBiquadFilter();
         noiseFilter.type = 'highpass';
-        noiseFilter.frequency.value = 1100;
+        noiseFilter.frequency.value = 1000;
 
         const noiseEnvelope = audioCtx.createGain();
         
@@ -222,59 +233,34 @@
         noiseFilter.connect(noiseEnvelope);
         noiseEnvelope.connect(audioCtx.destination);
 
-        noiseEnvelope.gain.setValueAtTime(0.15, time);
+        noiseEnvelope.gain.setValueAtTime(0.18, time);
         noiseEnvelope.gain.exponentialRampToValueAtTime(0.01, time + 0.12);
 
         noise.start(time);
         noise.stop(time + 0.12);
     }
 
-    // 3. 🎯【核心突破】100% 硬件合成清脆电子口令（完全避开苹果系统TTS，确保两台设备音色完全一致、节拍0延迟！）
-    // 这里我们合成一个高穿透力的“哔/叮”双音高组合口令，用音调的高低变化来直观代表 1 ~ 8：
-    const notes = {
-        1: 523.25, // C5
-        2: 587.33, // D5
-        3: 659.25, // E5
-        4: 698.46, // F5
-        5: 783.99, // G5
-        6: 880.00, // A5
-        7: 987.77, // B5
-        8: 1046.50 // C6
-    };
+    // 3. 极速发音（人声）
+    const numWords = ["零", "一", "二", "三", "四", "五", "六", "七", "八"];
+    function playVoice(section, beat) {
+        let text = beat === 1 ? numWords[section] : numWords[beat];
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        if (preferredVoice) utterance.voice = preferredVoice;
 
-    function playSynthVoice(beat, time) {
-        const osc1 = audioCtx.createOscillator();
-        const osc2 = audioCtx.createOscillator();
-        const gainNode = audioCtx.createGain();
+        const bpm = parseInt(bpmSlider.value);
+        utterance.rate = Math.max(1.2, bpm / 80); // 提升发音语速，绝不拖泥带水
 
-        osc1.connect(gainNode);
-        osc2.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
-
-        // 使用双振荡器合成一种清脆、饱满的类似电子音叉的声音
-        const freq = notes[beat] || 523.25;
-        osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(freq, time);
-
-        osc2.type = 'triangle';
-        osc2.frequency.setValueAtTime(freq * 2, time); // 高一个八度的泛音，增加声音的“清脆感”与“活力”
-
-        // 极速淡入淡出，干净利落不拖尾
-        gainNode.gain.setValueAtTime(0, time);
-        gainNode.gain.linearRampToValueAtTime(0.25, time + 0.02);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
-
-        osc1.start(time);
-        osc1.stop(time + 0.2);
-        osc2.start(time);
-        osc2.stop(time + 0.2);
+        window.speechSynthesis.cancel(); 
+        window.speechSynthesis.speak(utterance);
     }
 
-    // 4. 精确累加时间
+    // 4. 计算下一个拍子的精确时间戳
     function nextNote() {
         const bpm = parseInt(bpmSlider.value);
         const secondsPerBeat = 60.0 / bpm;
-        nextNoteTime += secondsPerBeat; 
+        nextNoteTime += secondsPerBeat; // 严格累加时间，零误差
 
         currentBeat++;
         if (currentBeat > beatsPerSection) {
@@ -286,19 +272,16 @@
         }
     }
 
-    // 5. 绝对对齐：口令与鼓声在硬件时间轴 time 上强制对齐
+    // 5. 高精度调度核心：提前将音效送入硬件队列
     function scheduleNote(s, b, time) {
-        // 1. 播放鼓点
+        // 音效严格按 time 精确触发
         if (b % 2 !== 0) {
             playKick(time);
         } else {
             playSnare(time);
         }
 
-        // 2. 播放绝对同步的口令声音（同属 Web Audio 硬件调度）
-        playSynthVoice(b, time);
-
-        // 3. 屏幕 UI 显示同步
+        // 界面更新与人声唤醒
         setTimeout(() => {
             if (!isPlaying) return;
             cells.forEach(c => c.classList.remove('active'));
@@ -307,10 +290,12 @@
 
             statusText.innerText = `第 ${s} 个八拍`;
             beatDisplay.innerText = `${s} - ${b}`;
+
+            playVoice(s, b);
         }, (time - audioCtx.currentTime) * 1000);
     }
 
-    // 6. 主循环
+    // 6. 主轮询循环
     function scheduler() {
         while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
             scheduleNote(currentSection, currentBeat, nextNoteTime);
@@ -319,7 +304,7 @@
         timerID = setTimeout(scheduler, lookahead);
     }
 
-    // 渲染网格
+    // 渲染 8x8 网格
     const cells = [];
     for (let s = 1; s <= totalSections; s++) {
         for (let b = 1; b <= beatsPerSection; b++) {
@@ -345,6 +330,7 @@
             actionBtn.innerText = "⏸ 暂停健身";
             actionBtn.className = "btn-stop";
             
+            // 重置精准时间戳
             currentSection = 1;
             currentBeat = 1;
             nextNoteTime = audioCtx.currentTime + 0.05;
@@ -355,6 +341,7 @@
             actionBtn.innerText = "▶ 开始健身";
             actionBtn.className = "btn-start";
             clearTimeout(timerID);
+            window.speechSynthesis.cancel();
             statusText.innerText = "已暂停";
         }
     });

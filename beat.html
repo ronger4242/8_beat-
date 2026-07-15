@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="八拍口令器">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3043/3043817.png">
+
+    <title>八拍口令器</title>
+    <style>
+        body {
+            font-family: -apple-system, system-ui, sans-serif;
+            background-color: #f0f4f8;
+            margin: 0;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 90vh;
+        }
+
+        .container {
+            background: #ffffff;
+            width: 95%;
+            max-width: 400px;
+            padding: 25px;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #2b6cb0;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+
+        .display-box {
+            background: #edf2f7;
+            border-radius: 18px;
+            padding: 30px 10px;
+            margin-bottom: 25px;
+        }
+
+        .status {
+            font-size: 20px;
+            color: #4a5568;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .numbers {
+            font-size: 64px;
+            font-weight: 900;
+            color: #2b6cb0;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 6px;
+            margin-bottom: 25px;
+        }
+
+        .cell {
+            aspect-ratio: 1;
+            background: #e2e8f0;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            color: #718096;
+        }
+
+        .cell.active {
+            background: #3182ce;
+            color: white;
+            transform: scale(1.15);
+            box-shadow: 0 0 10px rgba(49, 130, 206, 0.5);
+        }
+
+        .control-group {
+            background: #edf2f7;
+            padding: 18px;
+            border-radius: 16px;
+            margin-bottom: 25px;
+        }
+
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 12px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 12px;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        button {
+            width: 100%;
+            padding: 20px;
+            font-size: 26px;
+            font-weight: bold;
+            border: none;
+            border-radius: 18px;
+            cursor: pointer;
+            color: white;
+            transition: background 0.2s;
+        }
+
+        .btn-start {
+            background: #3182ce;
+            box-shadow: 0 4px 12px rgba(49, 130, 206, 0.4);
+        }
+
+        .btn-stop {
+            background: #e53e3e;
+            box-shadow: 0 4px 12px rgba(229, 62, 62, 0.4);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📢 爸爸的八拍口令器</h1>
+    
+    <div class="display-box">
+        <div class="status" id="status-text">准备就绪</div>
+        <div class="numbers" id="beat-display">点开始</div>
+    </div>
+
+    <div class="grid" id="beat-grid"></div>
+
+    <div class="control-group">
+        <div class="label-row">
+            <span>当前速度</span>
+            <span id="bpm-val" style="color:#3182ce; font-size:22px;">100 BPM</span>
+        </div>
+        <input type="range" id="bpm-slider" min="60" max="160" value="100">
+    </div>
+
+    <button class="btn-start" id="btn-action">▶ 开始播放</button>
+</div>
+
+<script>
+    const totalSections = 8;
+    const beatsPerSection = 8;
+    let currentSection = 1;
+    let currentBeat = 1;
+    let isPlaying = false;
+    let timer = null;
+
+    const gridContainer = document.getElementById('beat-grid');
+    const actionBtn = document.getElementById('btn-action');
+    const bpmSlider = document.getElementById('bpm-slider');
+    const bpmVal = document.getElementById('bpm-val');
+    const beatDisplay = document.getElementById('beat-display');
+    const statusText = document.getElementById('status-text');
+
+    // 渲染 8x8 键盘
+    const cells = [];
+    for (let s = 1; s <= totalSections; s++) {
+        for (let b = 1; b <= beatsPerSection; b++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.id = `cell-${s}-${b}`;
+            cell.innerText = `${s}-${b}`;
+            gridContainer.appendChild(cell);
+            cells.push(cell);
+        }
+    }
+
+    const numWords = ["零", "一", "二", "三", "四", "五", "六", "七", "八"];
+
+    function playVoice(section, beat) {
+        let text = beat === 1 ? numWords[section] : numWords[beat];
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        const bpm = parseInt(bpmSlider.value);
+        utterance.rate = Math.max(1.0, bpm / 100); 
+        
+        window.speechSynthesis.cancel(); 
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function tick() {
+        cells.forEach(c => c.classList.remove('active'));
+        const activeCell = document.getElementById(`cell-${currentSection}-${currentBeat}`);
+        if (activeCell) activeCell.classList.add('active');
+
+        statusText.innerText = `第 ${currentSection} 个八拍`;
+        beatDisplay.innerText = `${currentSection} - ${currentBeat}`;
+
+        playVoice(currentSection, currentBeat);
+
+        currentBeat++;
+        if (currentBeat > beatsPerSection) {
+            currentBeat = 1;
+            currentSection++;
+        }
+        if (currentSection > totalSections) {
+            currentSection = 1; 
+        }
+    }
+
+    function startTimer() {
+        if (timer) clearInterval(timer);
+        const bpm = parseInt(bpmSlider.value);
+        timer = setInterval(tick, 60000 / bpm);
+    }
+
+    actionBtn.addEventListener('click', () => {
+        if (!isPlaying) {
+            isPlaying = true;
+            actionBtn.innerText = "⏸ 暂停播放";
+            actionBtn.className = "btn-stop";
+            tick();
+            startTimer();
+        } else {
+            isPlaying = false;
+            actionBtn.innerText = "▶ 开始播放";
+            actionBtn.className = "btn-start";
+            clearInterval(timer);
+            window.speechSynthesis.cancel();
+            statusText.innerText = "已暂停";
+        }
+    });
+
+    bpmSlider.addEventListener('input', (e) => {
+        bpmVal.innerText = `${e.target.value} BPM`;
+        if (isPlaying) startTimer();
+    });
+</script>
+
+</body>
+</html>

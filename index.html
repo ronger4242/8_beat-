@@ -6,14 +6,15 @@
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="八拍口令器">
+    <meta name="apple-mobile-web-app-title" content="动感口令器">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3043/3043817.png">
 
-    <title>八拍口令器</title>
+    <title>动感八拍口令器</title>
     <style>
         body {
             font-family: -apple-system, system-ui, sans-serif;
-            background-color: #f0f4f8;
+            background-color: #0f172a; /* 酷炫深色背景 */
+            color: #f8fafc;
             margin: 0;
             padding: 15px;
             display: flex;
@@ -24,33 +25,34 @@
         }
 
         .container {
-            background: #ffffff;
+            background: #1e293b;
             width: 95%;
             max-width: 400px;
             padding: 25px;
             border-radius: 24px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
             text-align: center;
             box-sizing: border-box;
         }
 
         h1 {
             font-size: 24px;
-            color: #2b6cb0;
+            color: #38bdf8;
             margin-top: 0;
             margin-bottom: 20px;
         }
 
         .display-box {
-            background: #edf2f7;
+            background: #0f172a;
             border-radius: 18px;
             padding: 30px 10px;
             margin-bottom: 25px;
+            border: 1px solid #334155;
         }
 
         .status {
             font-size: 20px;
-            color: #4a5568;
+            color: #94a3b8;
             font-weight: bold;
             margin-bottom: 10px;
         }
@@ -58,7 +60,8 @@
         .numbers {
             font-size: 64px;
             font-weight: 900;
-            color: #2b6cb0;
+            color: #38bdf8;
+            text-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
         }
 
         .grid {
@@ -70,28 +73,29 @@
 
         .cell {
             aspect-ratio: 1;
-            background: #e2e8f0;
+            background: #334155;
             border-radius: 6px;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 11px;
             font-weight: bold;
-            color: #718096;
+            color: #94a3b8;
         }
 
         .cell.active {
-            background: #3182ce;
-            color: white;
+            background: #38bdf8;
+            color: #0f172a;
             transform: scale(1.15);
-            box-shadow: 0 0 10px rgba(49, 130, 206, 0.5);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.8);
         }
 
         .control-group {
-            background: #edf2f7;
+            background: #0f172a;
             padding: 18px;
             border-radius: 16px;
             margin-bottom: 25px;
+            border: 1px solid #334155;
         }
 
         .label-row {
@@ -107,6 +111,7 @@
             height: 12px;
             border-radius: 6px;
             outline: none;
+            background: #334155;
         }
 
         button {
@@ -122,37 +127,37 @@
         }
 
         .btn-start {
-            background: #3182ce;
-            box-shadow: 0 4px 12px rgba(49, 130, 206, 0.4);
+            background: #0284c7;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
         }
 
         .btn-stop {
-            background: #e53e3e;
-            box-shadow: 0 4px 12px rgba(229, 62, 62, 0.4);
+            background: #ef4444;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
         }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>📢 爸爸的活力口令器</h1>
+    <h1>⚡ 爸爸的动感口令器</h1>
     
     <div class="display-box">
-        <div class="status" id="status-text">准备就绪</div>
-        <div class="numbers" id="beat-display">点开始</div>
+        <div class="status" id="status-text">准备运动</div>
+        <div class="numbers" id="beat-display">GO!</div>
     </div>
 
     <div class="grid" id="beat-grid"></div>
 
     <div class="control-group">
         <div class="label-row">
-            <span>当前速度</span>
-            <span id="bpm-val" style="color:#3182ce; font-size:22px;">100 BPM</span>
+            <span>运动速度</span>
+            <span id="bpm-val" style="color:#38bdf8; font-size:22px;">100 BPM</span>
         </div>
-        <input type="range" id="bpm-slider" min="60" max="150" value="100">
+        <input type="range" id="bpm-slider" min="65" max="150" value="100">
     </div>
 
-    <button class="btn-start" id="btn-action">▶ 开始播放</button>
+    <button class="btn-start" id="btn-action">▶ 开始健身</button>
 </div>
 
 <script>
@@ -170,64 +175,75 @@
     const beatDisplay = document.getElementById('beat-display');
     const statusText = document.getElementById('status-text');
 
-    // 预加载真人活力配音（托管在稳定CDN上）
-    const audioFiles = {
-        1: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg', // 备用
-        '一': 'https://dict.youdao.com/dictvoice?audio=%E4%B8%80&le=zh',
-        '二': 'https://dict.youdao.com/dictvoice?audio=%E4%BA%8C&le=zh',
-        '三': 'https://dict.youdao.com/dictvoice?audio=%E4%B8%89&le=zh',
-        '四': 'https://dict.youdao.com/dictvoice?audio=%E5%9B%9B&le=zh',
-        '五': 'https://dict.youdao.com/dictvoice?audio=%E4%BA%94&le=zh',
-        '六': 'https://dict.youdao.com/dictvoice?audio=%E5%85%AD&le=zh',
-        '七': 'https://dict.youdao.com/dictvoice?audio=%E4%B8%83&le=zh',
-        '八': 'https://dict.youdao.com/dictvoice?audio=%E5%85%AB&le=zh'
-    };
-
-    // 使用 Web Audio API 进行精准无延迟音频播放与变速
+    // Web Audio 接口：用来制造强劲的电子鼓点背景音
     let audioCtx = null;
-    const audioBuffers = {};
 
-    const numWords = ["零", "一", "二", "三", "四", "五", "六", "七", "八"];
+    // 1. 制造大鼓声 (Kick - 咚) - 浑厚重低音
+    function playKick(time) {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
 
-    // 异步预加载所有声音
-    async function initAudio() {
-        if (audioCtx) return;
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        
-        statusText.innerText = "正在加载声音...";
-        
-        const loadPromises = Object.keys(audioFiles).map(async (key) => {
-            try {
-                const response = await fetch(audioFiles[key]);
-                const arrayBuffer = await response.arrayBuffer();
-                audioBuffers[key] = await audioCtx.decodeAudioData(arrayBuffer);
-            } catch (e) {
-                console.error("加载声音失败:", key, e);
-            }
-        });
+        osc.frequency.setValueAtTime(120, time);
+        osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.3);
 
-        await Promise.all(loadPromises);
-        statusText.innerText = "加载完成！";
+        gain.gain.setValueAtTime(0.5, time);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3);
+
+        osc.start(time);
+        osc.stop(time + 0.3);
     }
 
-    // 播放指定声音，并根据BPM动态微调语速
-    function playSound(word) {
-        if (!audioCtx || !audioBuffers[word]) return;
-
-        const source = audioCtx.createBufferSource();
-        source.buffer = audioBuffers[word];
-
-        // 核心：根据BPM调整声音播放速度，避免高BPM时声音重叠
-        const bpm = parseInt(bpmSlider.value);
-        if (bpm > 110) {
-            source.playbackRate.value = bpm / 100; // 速度快时，声音也稍微变快
+    // 2. 制造军鼓声 (Snare - 哒) - 清脆动感
+    function playSnare(time) {
+        // 白噪声源，用于沙沙的打击感
+        const bufferSize = audioCtx.sampleRate * 0.15;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
         }
 
-        source.connect(audioCtx.destination);
-        source.start(0);
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+
+        const noiseFilter = audioCtx.createBiquadFilter();
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.value = 1000;
+
+        const noiseEnvelope = audioCtx.createGain();
+        
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseEnvelope);
+        noiseEnvelope.connect(audioCtx.destination);
+
+        noiseEnvelope.gain.setValueAtTime(0.18, time);
+        noiseEnvelope.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+
+        noise.start(time);
+        noise.stop(time + 0.15);
     }
 
+    // 3. 语音播报口令（双管齐下）
+    const numWords = ["零", "一", "二", "三", "四", "五", "六", "七", "八"];
+    function playVoice(section, beat) {
+        let text = beat === 1 ? numWords[section] : numWords[beat];
+        
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        const bpm = parseInt(bpmSlider.value);
+        utterance.rate = Math.max(1.1, bpm / 90); // 略微加快说话速度，显得更精神
+
+        window.speechSynthesis.cancel(); 
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // 4. 核心步进
     function tick() {
+        const time = audioCtx.currentTime;
+
+        // 渲染高亮网格
         cells.forEach(c => c.classList.remove('active'));
         const activeCell = document.getElementById(`cell-${currentSection}-${currentBeat}`);
         if (activeCell) activeCell.classList.add('active');
@@ -235,9 +251,18 @@
         statusText.innerText = `第 ${currentSection} 个八拍`;
         beatDisplay.innerText = `${currentSection} - ${currentBeat}`;
 
-        // 核心发声逻辑
-        let wordToPlay = currentBeat === 1 ? numWords[currentSection] : numWords[currentBeat];
-        playSound(wordToPlay);
+        // 🔊 鼓点节奏编排：
+        // 奇数拍 (1, 3, 5, 7) 敲大鼓 (咚)
+        if (currentBeat % 2 !== 0) {
+            playKick(time);
+        } 
+        // 偶数拍 (2, 4, 6, 8) 敲军鼓 (哒)
+        else {
+            playSnare(time);
+        }
+
+        // 同时喊出口令
+        playVoice(currentSection, currentBeat);
 
         currentBeat++;
         if (currentBeat > beatsPerSection) {
@@ -255,7 +280,7 @@
         timer = setInterval(tick, 60000 / bpm);
     }
 
-    // 渲染网格
+    // 渲染 8x8 键盘
     const cells = [];
     for (let s = 1; s <= totalSections; s++) {
         for (let b = 1; b <= beatsPerSection; b++) {
@@ -268,26 +293,26 @@
         }
     }
 
-    actionBtn.addEventListener('click', async () => {
-        // 苹果手机首次点击必须激活音频上下文
+    actionBtn.addEventListener('click', () => {
         if (!audioCtx) {
-            await initAudio();
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         }
         if (audioCtx.state === 'suspended') {
-            await audioCtx.resume();
+            audioCtx.resume();
         }
 
         if (!isPlaying) {
             isPlaying = true;
-            actionBtn.innerText = "⏸ 暂停播放";
+            actionBtn.innerText = "⏸ 暂停健身";
             actionBtn.className = "btn-stop";
             tick();
             startTimer();
         } else {
             isPlaying = false;
-            actionBtn.innerText = "▶ 开始播放";
+            actionBtn.innerText = "▶ 开始健身";
             actionBtn.className = "btn-start";
             clearInterval(timer);
+            window.speechSynthesis.cancel();
             statusText.innerText = "已暂停";
         }
     });

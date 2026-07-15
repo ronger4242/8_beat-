@@ -155,9 +155,9 @@
     <div class="control-group">
         <div class="label-row">
             <span>运动速度</span>
-            <span id="bpm-val" style="color:#38bdf8; font-size:18px;">100 BPM</span>
+            <span id="bpm-val" style="color:#38bdf8; font-size:18px;">66 BPM</span>
         </div>
-        <input type="range" id="bpm-slider" min="65" max="150" value="100">
+        <input type="range" id="bpm-slider" min="40" max="150" value="66">
     </div>
 </div>
 
@@ -250,7 +250,8 @@
         if (preferredVoice) utterance.voice = preferredVoice;
 
         const bpm = parseInt(bpmSlider.value);
-        utterance.rate = Math.max(1.2, bpm / 80); // 提升发音语速，绝不拖泥带水
+        // 动态调整语速：速度极慢时发音也稍微沉稳一些
+        utterance.rate = Math.max(1.0, bpm / 80); 
 
         window.speechSynthesis.cancel(); 
         window.speechSynthesis.speak(utterance);

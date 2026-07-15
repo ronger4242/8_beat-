@@ -6,14 +6,14 @@
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="动感口令器">
+    <meta name="apple-mobile-web-app-title" content="精准口令器">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3043/3043817.png">
 
-    <title>动感八拍口令器</title>
+    <title>精准动感八拍口令器</title>
     <style>
         body {
             font-family: -apple-system, system-ui, sans-serif;
-            background-color: #0f172a; /* 酷炫深色背景 */
+            background-color: #0f172a; 
             color: #f8fafc;
             margin: 0;
             padding: 10px;
@@ -42,7 +42,6 @@
             margin-bottom: 12px;
         }
 
-        /* 状态显示区 */
         .display-box {
             background: #0f172a;
             border-radius: 12px;
@@ -66,7 +65,6 @@
             line-height: 1;
         }
 
-        /* 🚀 按钮移到了这里：超级醒目的主按钮 */
         button {
             width: 100%;
             padding: 15px;
@@ -77,7 +75,7 @@
             cursor: pointer;
             color: white;
             transition: background 0.2s;
-            margin-bottom: 15px; /* 距离下方格子的间距 */
+            margin-bottom: 15px;
         }
 
         .btn-start {
@@ -90,7 +88,6 @@
             box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
         }
 
-        /* 紧凑的 8x8 网格，防止撑开屏幕 */
         .grid {
             display: grid;
             grid-template-columns: repeat(8, 1fr);
@@ -117,7 +114,6 @@
             box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
         }
 
-        /* 速度控制区 */
         .control-group {
             background: #0f172a;
             padding: 12px;
@@ -145,10 +141,10 @@
 <body>
 
 <div class="container">
-    <h1>⚡ 爸爸的动感口令器</h1>
+    <h1>⚡ 爸爸的绝对精准口令器</h1>
     
     <div class="display-box">
-        <div class="status" id="status-text">准备运动</div>
+        <div class="status" id="status-text">高精度时钟就绪</div>
         <div class="numbers" id="beat-display">GO!</div>
     </div>
 
@@ -168,10 +164,19 @@
 <script>
     const totalSections = 8;
     const beatsPerSection = 8;
+    
     let currentSection = 1;
     let currentBeat = 1;
     let isPlaying = false;
-    let timer = null;
+    
+    // 高精度时间调度变量
+    let audioCtx = null;
+    let nextNoteTime = 0.0;     // 下一个音符播放的精确时间
+    let timerID = null;         // 高频预调度检查器
+    let preferredVoice = null;
+
+    const lookahead = 25.0;     // 每 25 毫秒检查一次
+    const scheduleAheadTime = 0.1; // 提前 0.1 秒把声音预排进系统硬件缓存
 
     const gridContainer = document.getElementById('beat-grid');
     const actionBtn = document.getElementById('btn-action');
@@ -180,9 +185,16 @@
     const beatDisplay = document.getElementById('beat-display');
     const statusText = document.getElementById('status-text');
 
-    let audioCtx = null;
+    // 锁定声音角色
+    function loadVoices() {
+        const voices = window.speechSynthesis.getVoices();
+        preferredVoice = voices.find(v => v.lang.includes('zh') && (v.name.includes('Tingting') || v.name.includes('婷婷'))) 
+                       || voices.find(v => v.lang.includes('zh'));
+    }
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
 
-    // 1. 大鼓 (Kick)
+    // 1. 重低音大鼓 (Kick) - 绑定精确时间戳 time
     function playKick(time) {
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -190,18 +202,18 @@
         gain.connect(audioCtx.destination);
 
         osc.frequency.setValueAtTime(120, time);
-        osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.3);
+        osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.25);
 
         gain.gain.setValueAtTime(0.5, time);
-        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.3);
+        gain.gain.exponentialRampToValueAtTime(0.01, time + 0.25);
 
         osc.start(time);
-        osc.stop(time + 0.3);
+        osc.stop(time + 0.25);
     }
 
-    // 2. 军鼓 (Snare)
+    // 2. 清脆军鼓 (Snare) - 绑定精确时间戳 time
     function playSnare(time) {
-        const bufferSize = audioCtx.sampleRate * 0.15;
+        const bufferSize = audioCtx.sampleRate * 0.12;
         const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
@@ -222,44 +234,33 @@
         noiseEnvelope.connect(audioCtx.destination);
 
         noiseEnvelope.gain.setValueAtTime(0.18, time);
-        noiseEnvelope.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+        noiseEnvelope.gain.exponentialRampToValueAtTime(0.01, time + 0.12);
 
         noise.start(time);
-        noise.stop(time + 0.15);
+        noise.stop(time + 0.12);
     }
 
-    // 3. 语音播报
+    // 3. 极速发音
     const numWords = ["零", "一", "二", "三", "四", "五", "六", "七", "八"];
     function playVoice(section, beat) {
         let text = beat === 1 ? numWords[section] : numWords[beat];
         
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'zh-CN';
+        if (preferredVoice) utterance.voice = preferredVoice;
+
         const bpm = parseInt(bpmSlider.value);
-        utterance.rate = Math.max(1.1, bpm / 90);
+        utterance.rate = Math.max(1.2, bpm / 80); // 提升发音语速，绝不拖泥带水
 
         window.speechSynthesis.cancel(); 
         window.speechSynthesis.speak(utterance);
     }
 
-    // 4. 定时器步进
-    function tick() {
-        const time = audioCtx.currentTime;
-
-        cells.forEach(c => c.classList.remove('active'));
-        const activeCell = document.getElementById(`cell-${currentSection}-${currentBeat}`);
-        if (activeCell) activeCell.classList.add('active');
-
-        statusText.innerText = `第 ${currentSection} 个八拍`;
-        beatDisplay.innerText = `${currentSection} - ${currentBeat}`;
-
-        if (currentBeat % 2 !== 0) {
-            playKick(time);
-        } else {
-            playSnare(time);
-        }
-
-        playVoice(currentSection, currentBeat);
+    // 4. 计算下一个拍子的精确时间戳
+    function nextNote() {
+        const bpm = parseInt(bpmSlider.value);
+        const secondsPerBeat = 60.0 / bpm;
+        nextNoteTime += secondsPerBeat; // 严格累加时间，零误差
 
         currentBeat++;
         if (currentBeat > beatsPerSection) {
@@ -267,17 +268,43 @@
             currentSection++;
         }
         if (currentSection > totalSections) {
-            currentSection = 1; 
+            currentSection = 1;
         }
     }
 
-    function startTimer() {
-        if (timer) clearInterval(timer);
-        const bpm = parseInt(bpmSlider.value);
-        timer = setInterval(tick, 60000 / bpm);
+    // 5. 高精度调度核心：提前将音效送入硬件队列
+    function scheduleNote(s, b, time) {
+        // 音效严格按 time 精确触发
+        if (b % 2 !== 0) {
+            playKick(time);
+        } else {
+            playSnare(time);
+        }
+
+        // 界面更新与语音唤醒
+        setTimeout(() => {
+            if (!isPlaying) return;
+            cells.forEach(c => c.classList.remove('active'));
+            const activeCell = document.getElementById(`cell-${s}-${b}`);
+            if (activeCell) activeCell.classList.add('active');
+
+            statusText.innerText = `第 ${s} 个八拍`;
+            beatDisplay.innerText = `${s} - ${b}`;
+
+            playVoice(s, b);
+        }, (time - audioCtx.currentTime) * 1000);
     }
 
-    // 渲染 8x8 键盘
+    // 6. 主轮询循环（高频检查，毫秒级补位）
+    function scheduler() {
+        while (nextNoteTime < audioCtx.currentTime + scheduleAheadTime) {
+            scheduleNote(currentSection, currentBeat, nextNoteTime);
+            nextNote();
+        }
+        timerID = setTimeout(scheduler, lookahead);
+    }
+
+    // 渲染 8x8 网格
     const cells = [];
     for (let s = 1; s <= totalSections; s++) {
         for (let b = 1; b <= beatsPerSection; b++) {
@@ -302,13 +329,18 @@
             isPlaying = true;
             actionBtn.innerText = "⏸ 暂停健身";
             actionBtn.className = "btn-stop";
-            tick();
-            startTimer();
+            
+            // 重置精准时间戳
+            currentSection = 1;
+            currentBeat = 1;
+            nextNoteTime = audioCtx.currentTime + 0.05;
+            
+            scheduler();
         } else {
             isPlaying = false;
             actionBtn.innerText = "▶ 开始健身";
             actionBtn.className = "btn-start";
-            clearInterval(timer);
+            clearTimeout(timerID);
             window.speechSynthesis.cancel();
             statusText.innerText = "已暂停";
         }
@@ -316,9 +348,8 @@
 
     bpmSlider.addEventListener('input', (e) => {
         bpmVal.innerText = `${e.target.value} BPM`;
-        if (isPlaying) startTimer();
     });
 </script>
 
-</body
+</body>
 </html>

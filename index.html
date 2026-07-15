@@ -135,7 +135,7 @@
 <body>
 
 <div class="container">
-    <h1>📢 爸爸的八拍口令器</h1>
+    <h1>📢 爸爸的活力口令器</h1>
     
     <div class="display-box">
         <div class="status" id="status-text">准备就绪</div>
@@ -149,7 +149,7 @@
             <span>当前速度</span>
             <span id="bpm-val" style="color:#3182ce; font-size:22px;">100 BPM</span>
         </div>
-        <input type="range" id="bpm-slider" min="60" max="160" value="100">
+        <input type="range" id="bpm-slider" min="60" max="150" value="100">
     </div>
 
     <button class="btn-start" id="btn-action">▶ 开始播放</button>
@@ -170,31 +170,61 @@
     const beatDisplay = document.getElementById('beat-display');
     const statusText = document.getElementById('status-text');
 
-    // 渲染 8x8 键盘
-    const cells = [];
-    for (let s = 1; s <= totalSections; s++) {
-        for (let b = 1; b <= beatsPerSection; b++) {
-            const cell = document.createElement('div');
-            cell.className = 'cell';
-            cell.id = `cell-${s}-${b}`;
-            cell.innerText = `${s}-${b}`;
-            gridContainer.appendChild(cell);
-            cells.push(cell);
-        }
-    }
+    // 预加载真人活力配音（托管在稳定CDN上）
+    const audioFiles = {
+        1: 'https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg', // 备用
+        '一': 'https://dict.youdao.com/dictvoice?audio=%E4%B8%80&le=zh',
+        '二': 'https://dict.youdao.com/dictvoice?audio=%E4%BA%8C&le=zh',
+        '三': 'https://dict.youdao.com/dictvoice?audio=%E4%B8%89&le=zh',
+        '四': 'https://dict.youdao.com/dictvoice?audio=%E5%9B%9B&le=zh',
+        '五': 'https://dict.youdao.com/dictvoice?audio=%E4%BA%94&le=zh',
+        '六': 'https://dict.youdao.com/dictvoice?audio=%E5%85%AD&le=zh',
+        '七': 'https://dict.youdao.com/dictvoice?audio=%E4%B8%83&le=zh',
+        '八': 'https://dict.youdao.com/dictvoice?audio=%E5%85%AB&le=zh'
+    };
+
+    // 使用 Web Audio API 进行精准无延迟音频播放与变速
+    let audioCtx = null;
+    const audioBuffers = {};
 
     const numWords = ["零", "一", "二", "三", "四", "五", "六", "七", "八"];
 
-    function playVoice(section, beat) {
-        let text = beat === 1 ? numWords[section] : numWords[beat];
+    // 异步预加载所有声音
+    async function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
         
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'zh-CN';
+        statusText.innerText = "正在加载声音...";
+        
+        const loadPromises = Object.keys(audioFiles).map(async (key) => {
+            try {
+                const response = await fetch(audioFiles[key]);
+                const arrayBuffer = await response.arrayBuffer();
+                audioBuffers[key] = await audioCtx.decodeAudioData(arrayBuffer);
+            } catch (e) {
+                console.error("加载声音失败:", key, e);
+            }
+        });
+
+        await Promise.all(loadPromises);
+        statusText.innerText = "加载完成！";
+    }
+
+    // 播放指定声音，并根据BPM动态微调语速
+    function playSound(word) {
+        if (!audioCtx || !audioBuffers[word]) return;
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = audioBuffers[word];
+
+        // 核心：根据BPM调整声音播放速度，避免高BPM时声音重叠
         const bpm = parseInt(bpmSlider.value);
-        utterance.rate = Math.max(1.0, bpm / 100); 
-        
-        window.speechSynthesis.cancel(); 
-        window.speechSynthesis.speak(utterance);
+        if (bpm > 110) {
+            source.playbackRate.value = bpm / 100; // 速度快时，声音也稍微变快
+        }
+
+        source.connect(audioCtx.destination);
+        source.start(0);
     }
 
     function tick() {
@@ -205,7 +235,9 @@
         statusText.innerText = `第 ${currentSection} 个八拍`;
         beatDisplay.innerText = `${currentSection} - ${currentBeat}`;
 
-        playVoice(currentSection, currentBeat);
+        // 核心发声逻辑
+        let wordToPlay = currentBeat === 1 ? numWords[currentSection] : numWords[currentBeat];
+        playSound(wordToPlay);
 
         currentBeat++;
         if (currentBeat > beatsPerSection) {
@@ -223,7 +255,28 @@
         timer = setInterval(tick, 60000 / bpm);
     }
 
-    actionBtn.addEventListener('click', () => {
+    // 渲染网格
+    const cells = [];
+    for (let s = 1; s <= totalSections; s++) {
+        for (let b = 1; b <= beatsPerSection; b++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            cell.id = `cell-${s}-${b}`;
+            cell.innerText = `${s}-${b}`;
+            gridContainer.appendChild(cell);
+            cells.push(cell);
+        }
+    }
+
+    actionBtn.addEventListener('click', async () => {
+        // 苹果手机首次点击必须激活音频上下文
+        if (!audioCtx) {
+            await initAudio();
+        }
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+
         if (!isPlaying) {
             isPlaying = true;
             actionBtn.innerText = "⏸ 暂停播放";
@@ -235,7 +288,6 @@
             actionBtn.innerText = "▶ 开始播放";
             actionBtn.className = "btn-start";
             clearInterval(timer);
-            window.speechSynthesis.cancel();
             statusText.innerText = "已暂停";
         }
     });
